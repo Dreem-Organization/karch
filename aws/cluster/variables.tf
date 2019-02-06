@@ -19,6 +19,12 @@ variable "availability-zones" {
   description = "Availability zones to span (for HA master deployments, see master-availability-zones)"
 }
 
+variable "multi-natgw" {
+  type        = "string"
+  description = "Boolean that indicates wether or not to create NAT Gateway per Availability Zone (default: true)"
+  default     = "true"
+}
+
 variable "kops-topology" {
   type        = "string"
   description = "Kops topolopy (public|private), (default: private)"
@@ -45,6 +51,13 @@ variable "main-zone-id" {
   type        = "string"
 
   default = ""
+}
+
+variable "create-dns-zone" {
+  description = "Route53 main zone ID (optional if the cluster zone is private)"
+  type        = "string"
+
+  default = "true"
 }
 
 variable "cluster-name" {
@@ -427,6 +440,13 @@ variable "bastion-hooks" {
   description = "Docker/Systemd hooks to add to the bastion instances only (add 2 spaces at the beginning of each line for indentation. Also, you'll need the '-' (dash) to indicate that this hook is part of a list.)"
 
   default = []
+}
+
+variable "bastion-max-price" {
+  type        = "string"
+  description = "Bastion Spot instance max price"
+
+  default = ""
 }
 
 # Initial minion instance group

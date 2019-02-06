@@ -84,7 +84,7 @@ EOF
     volume-provisioned-iops = "${var.bastion-volume-provisioned-iops == "" ? "" : var.bastion-volume-provisioned-iops}"
     volume-type             = "${var.bastion-volume-type}"
     ebs-optimized           = "${var.bastion-ebs-optimized}"
-    max-price               = ""
+    max-price               = "maxPrice: '${var.bastion-max-price}'"
     taints                  = ""
     subnets                 = "${join("\n", data.template_file.minion-subnets.*.rendered)}"
     hooks                   = "${join("\n", data.template_file.bastion-hooks.*.rendered)}"
