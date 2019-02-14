@@ -22,7 +22,7 @@ EOF
     volume-provisioned-iops = "${var.volume-provisioned-iops == "" ? "" : var.volume-provisioned-iops}"
     volume-type             = "${var.volume-type}"
     ebs-optimized           = "${var.ebs-optimized}"
-    max-price               = "maxPrice: '${var.max-price}'"
+    max-price               = "${ var.max-price == "" ? "" : "maxPrice: '${var.max-price}'"}"
     taints                  = "${join("\n", data.template_file.taints.*.rendered)}"
     subnets                 = "${join("\n", data.template_file.subnets.*.rendered)}"
     hooks                   = "${join("\n", data.template_file.hooks.*.rendered)}"
