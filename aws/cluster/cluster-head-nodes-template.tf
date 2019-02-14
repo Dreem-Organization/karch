@@ -159,7 +159,7 @@ EOF
     volume-provisioned-iops = "${var.minion-volume-provisioned-iops == "" ? "" : var.minion-volume-provisioned-iops}"
     volume-type             = "${var.minion-volume-type}"
     ebs-optimized           = "${var.minion-ebs-optimized}"
-    max-price               = ""
+    max-price               = "maxPrice: '${var.minion-max-price}'"
     taints                  = "${join("\n", data.template_file.minion-taints.*.rendered)}"
     subnets                 = "${join("\n", data.template_file.minion-subnets.*.rendered)}"
     hooks                   = "${join("\n", data.template_file.minion-hooks.*.rendered)}"

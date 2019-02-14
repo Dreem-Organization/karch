@@ -497,6 +497,13 @@ variable "minion-volume-size" {
   default = "30"
 }
 
+variable "minion-max-price" {
+  type        = "string"
+  description = "If set, this group will use spot instances with the specified max-price"
+
+  default = ""
+}
+
 variable "minion-volume-provisioned-iops" {
   type        = "string"
   description = "Minion volume provisioned IOPS, if applicable"
