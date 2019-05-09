@@ -1,0 +1,121 @@
+# Just an example service to confirm that requests are routed to pods
+# accordingly
+apiVersion: v1
+kind: Service
+metadata:
+  name: pong
+  labels:
+    app: pong
+spec:
+  type: ClusterIP
+  selector:
+    app: pong
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+    name: http
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: pong
+  annotations:
+    kubernetes.io/tls-acme: "true"
+spec:
+  tls:
+  - secretName: tls-pong
+    hosts:
+    - pong.${domain}
+  rules:
+  - host: pong.${domain}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: pong
+          servicePort: http
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: pong
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pong
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pong
+spec:
+  scaleTargetRef:
+    apiVersion: extensions/v1beta1
+    kind: Deployment
+    name: pong
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 30
+---
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: pong
+  labels:
+    app: pong
+spec:
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: pong
+  template:
+    metadata:
+      labels:
+        app: pong
+    spec:
+      terminationGracePeriodSeconds: 10
+      nodeSelector:
+        duty: webserver
+      containers:
+      - image: nginx:alpine
+        name: nginx
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 300m
+            memory: 200Mi
+        livenessProbe:
+          httpGet:
+            scheme: HTTP
+            port: 80
+        readinessProbe:
+          httpGet:
+            scheme: HTTP
+            port: 80
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["pong"]
+              topologyKey: kubernetes.io/hostname
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["pong"]
+              topologyKey: failure-domain.beta.kubernetes.io/zone

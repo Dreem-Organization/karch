@@ -2,47 +2,71 @@ data "template_file" "cluster-spec" {
   template = "${file("${path.module}/templates/cluster-spec.yaml")}"
 
   vars {
-    cluster-name       = "${aws_route53_record.cluster-root.name}"
+    # Generic cluster configuration
+    cluster-name       = "${var.cluster-name}"
     channel            = "${var.channel}"
     disable-sg-ingress = "${var.disable-sg-ingress}"
     cloud-labels       = "${join("\n", data.template_file.cloud-labels.*.rendered)}"
     kube-dns-domain    = "${var.kube-dns-domain}"
     kops-state-bucket  = "${var.kops-state-bucket}"
 
+    master-lb-visibility     = "${var.master-lb-visibility == "Private" ? "Internal" : "Public"}"
+    master-lb-dns-visibility = "${var.master-lb-visibility}"
+    master-count             = "${length(var.master-availability-zones)}"
+    master-lb-idle-timeout   = "${var.master-lb-idle-timeout}"
+
+    kubernetes-version   = "${var.kubernetes-version}"
+    vpc-cidr             = "${aws_vpc.main.cidr_block}"
+    vpc-id               = "${aws_vpc.main.id}"
+    trusted-cidrs        = "${join("\n", data.template_file.trusted-cidrs.*.rendered)}"
+    subnets              = "${join("\n", data.template_file.subnets.*.rendered)}"
+    container-networking = "${var.container-networking}"
+
+    hooks = "${join("\n", data.template_file.hooks.*.rendered)}"
+
+    # ETCD cluster parameters
     etcd-clusters = <<EOF
   - etcdMembers:
 ${join("\n", data.template_file.etcd-member.*.rendered)}
     name: main
+    enableEtcdTLS: ${var.etcd-enable-tls ? "true" : "false"}
+    version: ${var.etcd-version}
   - etcdMembers:
 ${join("\n", data.template_file.etcd-member.*.rendered)}
     name: events
+    enableEtcdTLS: ${var.etcd-enable-tls}
+    version: ${var.etcd-version}
 EOF
 
-    master-lb-visibility   = "${var.master-lb-visibility}"
-    master-count           = "${length(var.master-availability-zones)}"
-    master-lb-idle-timeout = "${var.master-lb-idle-timeout}"
-
+    # Kubelet configuration
     # CPU and Memory reservation for system/orchestration processes (soft)
-    kubelet-eviction-flag  = "${var.kubelet-eviction-flag}"
+    kubelet-eviction-flag = "${var.kubelet-eviction-flag}"
+
     kube-reserved-cpu      = "${var.kube-reserved-cpu}"
     kube-reserved-memory   = "${var.kube-reserved-memory}"
     system-reserved-cpu    = "${var.system-reserved-cpu}"
     system-reserved-memory = "${var.system-reserved-memory}"
 
+    # APIServer configuration
+    apiserver-storage-backend    = "etcd${substr(var.etcd-version, 0, 1)}"
     kops-authorization-mode      = "${var.rbac == "true" ? "rbac": "alwaysAllow"}"
     apiserver-authorization-mode = "${var.rbac == "true" ? "RBAC": "AlwaysAllow"}"
     rbac-super-user              = "${var.rbac == "true" ? "authorizationRbacSuperUser: ${var.rbac-super-user}" : ""}"
 
-    apiserver-runtime-config      = "${join("\n", data.template_file.apiserver-runtime-configs.*.rendered)}"
-    apiserver-rbac-runtime-config = "${var.rbac == "true" ? "rbac.authorization.k8s.io/v1alpha1: 'true'": ""}"
+    apiserver-runtime-config = "${join("\n", data.template_file.apiserver-runtime-configs.*.rendered)}"
+    oidc-config              = "${join("\n", data.template_file.oidc-apiserver-conf.*.rendered)}"
 
-    oidc-config = "${join("\n", data.template_file.oidc-apiserver-conf.*.rendered)}"
+    # kube-controller-manager configuration
+    hpa-sync-period      = "${var.hpa-sync-period}"
+    hpa-scale-down-delay = "${var.hpa-scale-down-delay}"
+    hpa-scale-up-delay   = "${var.hpa-scale-up-delay}"
 
-    kubernetes-version = "${var.kubernetes-version}"
-    vpc-cidr           = "${aws_vpc.main.cidr_block}"
-    vpc-id             = "${aws_vpc.main.id}"
-    trusted-cidrs      = "${join("\n", data.template_file.trusted-cidrs.*.rendered)}"
-    subnets            = "${join("\n", data.template_file.subnets.*.rendered)}"
+    # Additional IAM policies for masters and nodes
+    master-additional-policies = "${length(var.master-additional-policies) == 0 ? "" : format("master: |\n      %s", indent(6, var.master-additional-policies))}"
+    node-additional-policies   = "${length(var.node-additional-policies) == 0 ? "" : format("node: |\n      %s", indent(6, var.node-additional-policies))}"
+
+    # Log level for all master & kubelet components
+    log-level = "${var.log-level}"
   }
 }
 
@@ -93,16 +117,22 @@ data "template_file" "subnets" {
     name: $${az}
     type: Private
     zone: $${az}
+    id: $${private-subnet-id}
+    egress: $${nat-gateway-id}
   - cidr: $${public-cidr}
     name: utility-$${az}
     type: Utility
     zone: $${az}
+    id: $${public-subnet-id}
 EOF
 
   vars {
-    az           = "${element(var.availability-zones, count.index)}"
-    private-cidr = "${cidrsubnet(aws_vpc.main.cidr_block, 3, count.index+1)}"
-    public-cidr  = "${cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)}"
+    az                = "${element(var.availability-zones, count.index)}"
+    private-cidr      = "${element(aws_subnet.private.*.cidr_block, count.index)}"
+    public-cidr       = "${element(aws_subnet.utility.*.cidr_block, count.index)}"
+    public-subnet-id  = "${element(aws_subnet.utility.*.id, count.index)}"
+    private-subnet-id = "${element(aws_subnet.private.*.id, count.index)}"
+    nat-gateway-id    = "${element(aws_nat_gateway.natgw.*.id, count.index)}"
   }
 }
 
@@ -122,4 +152,12 @@ data "template_file" "apiserver-runtime-configs" {
   count = "${length(var.apiserver-runtime-flags)}"
 
   template = "      ${element(keys(var.apiserver-runtime-flags), count.index)}: '${element(values(var.apiserver-runtime-flags), count.index)}'"
+}
+
+data "template_file" "hooks" {
+  count = "${length(var.hooks)}"
+
+  template = <<EOF
+${element(var.hooks, count.index)}
+EOF
 }

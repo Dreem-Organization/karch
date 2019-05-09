@@ -4,6 +4,21 @@ variable "master-up" {
   description = "Terraform dependency hook to wait for the master cluster to be up before creating instance groups"
 }
 
+# Kops env. overrides
+variable "nodeup-url-env" {
+  type        = "string"
+  description = "NODEUP_URL env. variable override for testing custom builds of nodeup"
+
+  default = ""
+}
+
+variable "aws-profile-env-override" {
+  type        = "string"
+  description = "String of the form AWS_PROFILE=xxxx to override the AWS Profile used by kops calls triggered by karch"
+
+  default = ""
+}
+
 # Instance group parameters
 variable "cluster-name" {
   type        = "string"
@@ -105,6 +120,13 @@ variable "max-price" {
   description = "If set, this group will use spot instances with the specified max-price"
 
   default = ""
+}
+
+variable "hooks" {
+  type        = "list"
+  description = "Docker/Systemd hooks to add to this instance group (add 2 spaces at the beginning of each line for indentation. Also, you'll need the '-' (dash) to indicate that this hook is part of a list.)"
+
+  default = []
 }
 
 # ASG configuration

@@ -9,8 +9,8 @@ variable "vpc-name" {
   type        = "string"
 }
 
-variable "vpc-number" {
-  description = "The VPC number. This will define the VPC IP range in CIDR notation as follows: 10.<vpc_number>.0.0/16"
+variable "vpc-cidr" {
+  description = "CIDR of the VPC housing the Kubernetes cluster"
   type        = "string"
 }
 
@@ -41,8 +41,10 @@ variable "admin-ssh-public-key-path" {
 
 ## DNS
 variable "main-zone-id" {
-  description = "Route53 main zone ID"
+  description = "Route53 main zone ID (optional if the cluster zone is private)"
   type        = "string"
+
+  default = ""
 }
 
 variable "cluster-name" {
@@ -58,6 +60,20 @@ variable "kube-dns-domain" {
 }
 
 # Kops & Kubernetes
+variable "nodeup-url-env" {
+  type        = "string"
+  description = "NODEUP_URL env. variable override for testing custom builds of nodeup"
+
+  default = ""
+}
+
+variable "aws-profile-env-override" {
+  type        = "string"
+  description = "String of the form AWS_PROFILE=xxxx to override the AWS Profile used by kops calls triggered by karch"
+
+  default = ""
+}
+
 variable "kops-state-bucket" {
   type        = "string"
   description = "Name of the bucket in which kops stores its state (must be created prior to cluster turnup)"
@@ -68,6 +84,27 @@ variable "disable-sg-ingress" {
   description = "Boolean that indicates wether or not to create and attach a security group to instance nodes and load balancers for each LoadBalancer service (default: false)"
 
   default = "false"
+}
+
+variable "etcd-version" {
+  type        = "string"
+  description = "Etcd version to use"
+
+  default = "3.1.11"
+}
+
+variable "etcd-enable-tls" {
+  type        = "string"
+  description = "Set to true to enable TLS on etcd containers"
+
+  default = "true"
+}
+
+variable "container-networking" {
+  type        = "string"
+  description = "Set the container CNI networking layer (https://github.com/kubernetes/kops/blob/master/docs/networking.md)"
+
+  default = "canal"
 }
 
 variable "rbac" {
@@ -89,6 +126,27 @@ variable "apiserver-runtime-flags" {
   description = "Map describing the --runtime-config parameter passed to the API server, useful to enable certain alphav2 APIs that aren't integrated in the API server by default, such a batch/v1alpha2 that introduces CronJobs (default: {}). Note: the RBAC flag is automatically set if you enabled RBAC with the 'rbac' variable above"
 
   default = {}
+}
+
+variable "hpa-sync-period" {
+  type        = "string"
+  description = "The frequency at which HPA are evaluated and reconciled"
+
+  default = "10s"
+}
+
+variable "hpa-scale-down-delay" {
+  type        = "string"
+  description = "After a downscale, wait at least for this duration before the next downscale"
+
+  default = "1m"
+}
+
+variable "hpa-scale-up-delay" {
+  type        = "string"
+  description = "After an upscale, wait at least for this duration before the next downscale"
+
+  default = "30s"
 }
 
 variable "oidc-issuer-url" {
@@ -134,13 +192,13 @@ variable "channel" {
 
 variable "kubernetes-version" {
   type        = "string"
-  description = "Kubernetes version to use for Core components (default: v1.7.4)"
-  default     = "v1.7.4"
+  description = "Kubernetes version to use for Core components (default: v1.8.4)"
+  default     = "v1.8.4"
 }
 
 variable "cloud-labels" {
   type        = "map"
-  description = "(Flat) map of kops cloud labels to apply to all resource in cluster"
+  description = "(Flat) map of kops cloud labels to apply to all resources in cluster"
 
   default = {}
 }
@@ -181,6 +239,14 @@ variable "system-reserved-memory" {
   default = "256Mi"
 }
 
+# Systemd/Docker hooks
+variable "hooks" {
+  type        = "list"
+  description = "Docker/Systemd hooks to add to this instance group (add 2 spaces at the beginning of each line for indentation. Also, you'll need the '-' (dash) to indicate that this hook is part of a list."
+
+  default = []
+}
+
 # Master instance group(s)
 variable "master-availability-zones" {
   type        = "list"
@@ -209,7 +275,7 @@ variable "master-machine-type" {
   type        = "string"
   description = "EC2 instance type to run our masters onto (default: m3.medium)"
 
-  default = "m3.medium"
+  default = "c4.large"
 }
 
 variable "master-volume-size" {
@@ -258,6 +324,13 @@ variable "master-node-labels" {
   description = "(Flat) map of Kubernetes node labels to add to master instances"
 
   default = {}
+}
+
+variable "master-hooks" {
+  type        = "list"
+  description = "Docker/Systemd hooks to add to the master instances only (add 2 spaces at the beginning of each line for indentation. Also, you'll need the '-' (dash) to indicate that this hook is part of a list.)"
+
+  default = []
 }
 
 # Bastion instance group
@@ -347,6 +420,13 @@ variable "bastion-node-labels" {
   description = "(Flat) map of Kubernetes node labels to add to bastion instances"
 
   default = {}
+}
+
+variable "bastion-hooks" {
+  type        = "list"
+  description = "Docker/Systemd hooks to add to the bastion instances only (add 2 spaces at the beginning of each line for indentation. Also, you'll need the '-' (dash) to indicate that this hook is part of a list.)"
+
+  default = []
 }
 
 # Initial minion instance group
@@ -457,4 +537,30 @@ variable "minion-node-labels" {
   description = "(Flat) map of Kubernetes node labels to add to minion instances"
 
   default = {}
+}
+
+variable "minion-hooks" {
+  type        = "list"
+  description = "Docker/Systemd hooks to add to the minion instances (in the IG created along with the cluster) only (add 2 spaces at the beginning of each line for indentation. Also, you'll need the '-' (dash) to indicate that this hook is part of a list.)"
+
+  default = []
+}
+
+variable "master-additional-policies" {
+  type        = "string"
+  description = "Additional IAM policies to add to our master instance role: https://github.com/kubernetes/kops/blob/master/docs/iam_roles.md#adding-additional-policies"
+  default     = ""
+}
+
+variable "node-additional-policies" {
+  type        = "string"
+  description = "Additional IAM policies to add to our node instance role: https://github.com/kubernetes/kops/blob/master/docs/iam_roles.md#adding-additional-policies"
+  default     = ""
+}
+
+variable "log-level" {
+  type        = "string"
+  description = "V-Log log level of all infrastructure components (APIServer, controller-manager, etc.)"
+
+  default = 0
 }

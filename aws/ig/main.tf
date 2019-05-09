@@ -7,7 +7,7 @@ resource "aws_s3_bucket_object" "ig-spec" {
   // On destroy, remove the IG, if it exists
   provisioner "local-exec" {
     when    = "destroy"
-    command = "(test -z \"$(kops get cluster | grep ${var.cluster-name})\" ) || kops --state=s3://${var.kops-state-bucket} delete ig --name ${var.cluster-name} --yes ${var.name}"
+    command = "(test -z \"$(${var.nodeup-url-env} ${var.aws-profile-env-override} kops --state=s3://${var.kops-state-bucket} get cluster | grep ${var.cluster-name})\" ) || ${var.nodeup-url-env} ${var.aws-profile-env-override} kops --state=s3://${var.kops-state-bucket} delete ig --name ${var.cluster-name} --yes ${var.name}"
   }
 }
 
@@ -19,20 +19,26 @@ resource "null_resource" "ig" {
 
   // Let's dump the ig spec on disk
   provisioner "local-exec" {
-    command = "echo \"${aws_s3_bucket_object.ig-spec.content}\" > ${path.module}/${var.cluster-name}-${var.name}-ig-spec.yml"
+    command = <<FILEDUMP
+      cat <<EOF > ${path.module}/${var.cluster-name}-${var.name}-ig-spec.yml
+${aws_s3_bucket_object.ig-spec.content}
+EOF
+FILEDUMP
   }
 
   // Let's register our Kops cluster into remote state
   provisioner "local-exec" {
     command = <<EOF
-      while test -f ${path.root}/.kops-ig-lock
+      until mkdir ${path.root}/.kops-ig-lock
       do
         echo "Waiting for other instance group update to finish"
-        sleep $[ ( $RANDOM % 10 )  + 10 ]s
+        sleep 5s
       done
       echo 'locked' > ${path.root}/.kops-ig-lock
-      kops --state=s3://${var.kops-state-bucket} create -f ${path.module}/${var.cluster-name}-${var.name}-ig-spec.yml
-      rm ${path.root}/.kops-ig-lock
+
+      ${var.nodeup-url-env} ${var.aws-profile-env-override} kops --state=s3://${var.kops-state-bucket} create -f ${path.module}/${var.cluster-name}-${var.name}-ig-spec.yml
+
+      rmdir ${path.root}/.kops-ig-lock
 EOF
   }
 
@@ -50,33 +56,37 @@ resource "null_resource" "ig-update" {
   }
 
   provisioner "local-exec" {
-    command = "echo \"${data.template_file.ig-spec.rendered}\" > ${path.module}/${var.cluster-name}-${var.name}-ig-spec.yml"
+    command = <<FILEDUMP
+      cat <<EOF > ${path.module}/${var.cluster-name}-${var.name}-ig-spec.yml
+${data.template_file.ig-spec.rendered}
+EOF
+FILEDUMP
   }
 
   provisioner "local-exec" {
     command = <<EOF
-      while test -f ${path.root}/.kops-ig-lock
+      until mkdir ${path.root}/.kops-ig-lock
       do
         echo "Waiting for other instance group update to finish"
-        sleep $[ ( $RANDOM % 10 )  + 10 ]s
+        sleep 5s
       done
       echo 'locked' > ${path.root}/.kops-ig-lock
 
-      kops --state=s3://${var.kops-state-bucket} \
+      ${var.nodeup-url-env} ${var.aws-profile-env-override} kops --state=s3://${var.kops-state-bucket} \
         replace -f ${path.module}/${var.cluster-name}-${var.name}-ig-spec.yml
 
       rm -f ${path.module}/${var.cluster-name}-${var.name}-ig-spec.yml
 
-      kops --state=s3://${var.kops-state-bucket} \
+      ${var.nodeup-url-env} ${var.aws-profile-env-override} kops --state=s3://${var.kops-state-bucket} \
         update cluster ${var.cluster-name} --yes
 
       KOPS_FEATURE_FLAGS="+DrainAndValidateRollingUpdate" \
-      kops --state=s3://${var.kops-state-bucket} \
+      ${var.nodeup-url-env} ${var.aws-profile-env-override} kops --state=s3://${var.kops-state-bucket} \
         rolling-update cluster ${var.cluster-name} \
           --node-interval="${var.update-interval}m" ${var.automatic-rollout == "true" ? "--yes" : ""}\
           --instance-group="${var.name}"
 
-      rm ${path.root}/.kops-ig-lock
+      rmdir ${path.root}/.kops-ig-lock
 EOF
   }
 
