@@ -12,6 +12,7 @@ spec:
   channel: ${channel}
   cloudConfig:
     disableSecurityGroupIngress: ${disable-sg-ingress}
+    ${elb-security-group}
   cloudLabels:
 ${cloud-labels}
   cloudProvider: aws
@@ -23,8 +24,8 @@ ${cloud-labels}
 ${etcd-clusters}
   keyStore: s3://${kops-state-bucket}/${cluster-name}/pki
   kubeAPIServer:
-    address: 127.0.0.1
-    admissionControl:
+    insecureBindAddress: 127.0.0.1
+    enableAdmissionPlugins:
     - NamespaceLifecycle
     - LimitRanger
     - ServiceAccount
@@ -42,14 +43,13 @@ ${etcd-clusters}
     anonymousAuth: false
     apiServerCount: ${master-count}
     authorizationMode: ${apiserver-authorization-mode}
-    ${rbac-super-user}
 ${oidc-config}
     cloudProvider: aws
     etcdServers:
     - http://127.0.0.1:4001
     etcdServersOverrides:
     - /events#http://127.0.0.1:4002
-    image: gcr.io/google_containers/kube-apiserver:${kubernetes-version}
+    image: gcr.io/google_containers/kube-apiserver:v${kubernetes-version}
     insecurePort: 8080
     kubeletPreferredAddressTypes:
     - InternalIP
@@ -73,7 +73,7 @@ ${apiserver-runtime-config}
     clusterCIDR: 100.96.0.0/11
     clusterName: ${cluster-name}
     configureCloudRoutes: false
-    image: gcr.io/google_containers/kube-controller-manager:${kubernetes-version}
+    image: gcr.io/google_containers/kube-controller-manager:v${kubernetes-version}
     leaderElection:
       leaderElect: true
     logLevel: ${log-level}
@@ -86,19 +86,23 @@ ${apiserver-runtime-config}
       ExpandPersistentVolumes: "true"
       Initializers: "true"
       PodPriority: "true"
+
   kubeDNS:
+    provider: ${dns-provider}
     domain: ${kube-dns-domain}
-    image: gcr.io/google_containers/kubedns-amd64:1.3
-    replicas: 2
     serverIP: 100.64.0.10
+
   kubeProxy:
     clusterCIDR: 100.96.0.0/11
     cpuRequest: 100m
+    memoryRequest: 100Mi
     hostnameOverride: '@aws'
-    image: gcr.io/google_containers/kube-proxy:${kubernetes-version}
+    image: gcr.io/google_containers/kube-proxy:v${kubernetes-version}
     logLevel: ${log-level}
+    proxyMode: ${kube-proxy-mode}
+
   kubeScheduler:
-    image: gcr.io/google_containers/kube-scheduler:${kubernetes-version}
+    image: gcr.io/google_containers/kube-scheduler:v${kubernetes-version}
     leaderElection:
       leaderElect: true
     logLevel: ${log-level}
@@ -117,7 +121,6 @@ ${apiserver-runtime-config}
     nonMasqueradeCIDR: 100.64.0.0/10
     podInfraContainerImage: gcr.io/google_containers/pause-amd64:3.0
     podManifestPath: /etc/kubernetes/manifests
-    requireKubeconfig: true
     kubeReserved:
       cpu: "${kube-reserved-cpu}"
       memory: "${kube-reserved-memory}"
@@ -150,12 +153,12 @@ ${trusted-cidrs}
     podInfraContainerImage: gcr.io/google_containers/pause-amd64:3.0
     podManifestPath: /etc/kubernetes/manifests
     registerSchedulable: false
-    requireKubeconfig: true
   masterPublicName: api.${cluster-name}
   networkCIDR: ${vpc-cidr}
   networkID: ${vpc-id}
   networking:
-    ${container-networking}: {}
+    ${container-networking}:
+${networking-config}
   nonMasqueradeCIDR: 100.64.0.0/10
   secretStore: s3://${kops-state-bucket}/${cluster-name}/secrets
   serviceClusterIPRange: 100.64.0.0/13

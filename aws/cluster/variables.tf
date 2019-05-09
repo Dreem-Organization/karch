@@ -59,6 +59,20 @@ variable "kube-dns-domain" {
   default = "cluster.local"
 }
 
+variable "dns-provider" {
+  type        = "string"
+  description = "The DNS provider to use (CoreDNS or KubeDNS)"
+
+  default = "CoreDNS"
+}
+
+variable "kube-proxy-mode" {
+  type        = "string"
+  description = "Load balancing method for kube-proxy (iptables or ipvs)"
+
+  default = "iptables"
+}
+
 # Kops & Kubernetes
 variable "nodeup-url-env" {
   type        = "string"
@@ -67,11 +81,11 @@ variable "nodeup-url-env" {
   default = ""
 }
 
-variable "aws-profile-env-override" {
+variable "aws-profile" {
   type        = "string"
-  description = "String of the form AWS_PROFILE=xxxx to override the AWS Profile used by kops calls triggered by karch"
+  description = "Name of the AWS profile in ~/.aws/credentials or ~/.aws/config to use"
 
-  default = ""
+  default = "default"
 }
 
 variable "kops-state-bucket" {
@@ -81,9 +95,16 @@ variable "kops-state-bucket" {
 
 variable "disable-sg-ingress" {
   type        = "string"
-  description = "Boolean that indicates wether or not to create and attach a security group to instance nodes and load balancers for each LoadBalancer service (default: false)"
+  description = "if set to true, a new rule will not be added for each load-balancer service to the nodes security group, you will have to authorize lb->node traffic with a custom security group you add to nodes"
 
   default = "false"
+}
+
+variable "lb-security-group" {
+  type        = "string"
+  description = "if enabled, no SG will be assigned to service E/NLBs and this group will be used instead"
+
+  default = ""
 }
 
 variable "etcd-version" {
@@ -104,21 +125,14 @@ variable "container-networking" {
   type        = "string"
   description = "Set the container CNI networking layer (https://github.com/kubernetes/kops/blob/master/docs/networking.md)"
 
-  default = "canal"
+  default = "calico"
 }
 
 variable "rbac" {
   type        = "string"
-  description = "Boolean indicating whether to enable RBAC authorization (default: false)"
+  description = "Boolean indicating whether to enable RBAC authorization"
 
-  default = "false"
-}
-
-variable "rbac-super-user" {
-  type        = "string"
-  description = "Name of the RBAC super user"
-
-  default = "admin"
+  default = "true"
 }
 
 variable "apiserver-runtime-flags" {
@@ -144,7 +158,7 @@ variable "hpa-scale-down-delay" {
 
 variable "hpa-scale-up-delay" {
   type        = "string"
-  description = "After an upscale, wait at least for this duration before the next downscale"
+  description = "After an upscale, wait at least for this duration before the next scale-out operation"
 
   default = "30s"
 }
@@ -158,9 +172,9 @@ variable "oidc-issuer-url" {
 
 variable "oidc-ca-file" {
   type        = "string"
-  description = "If using OpendID Connect, the oidc CA file on the APIServer pod"
+  description = "If using OpendID Connect, the oidc CA file on the APIServer pod, leave empty to use your hosts root CAs (eg.: for SSO with Google)"
 
-  default = "/srv/kubernetes/ca.crt"
+  default = ""
 }
 
 variable "oidc-client-id" {
@@ -172,16 +186,16 @@ variable "oidc-client-id" {
 
 variable "oidc-username-claim" {
   type        = "string"
-  description = "If using OpendID Connect, the oidc username claim"
+  description = "If using OpendID Connect, the oidc username claim (default: email)"
 
   default = "email"
 }
 
 variable "oidc-groups-claim" {
   type        = "string"
-  description = "If using OpendID Connect, the oidc group claim"
+  description = "If using OpendID Connect, the oidc group claim, leave empty if your OIDC provider doesn't provide such a claim (e.g.: Google SSO) or if you don't want to use it"
 
-  default = "groups"
+  default = ""
 }
 
 variable "channel" {
@@ -266,6 +280,20 @@ variable "master-lb-idle-timeout" {
   default     = 300
 }
 
+variable "master-additional-sgs" {
+  type        = "list"
+  description = "Security groups to add to our master nodes"
+
+  default = []
+}
+
+variable "master-additional-sgs-count" {
+  type        = "string"
+  description = "Number of security groups to add to our master nodes"
+
+  default = 0
+}
+
 variable "master-image" {
   type        = "string"
   description = "AMI id to use for the master nodes"
@@ -341,7 +369,7 @@ variable "bastion-image" {
 
 variable "bastion-additional-sgs" {
   type        = "list"
-  description = "Number of security groups to add to our bastion nodes"
+  description = "Security groups to add to our bastion nodes"
 
   default = []
 }

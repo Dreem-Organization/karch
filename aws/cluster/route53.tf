@@ -4,8 +4,15 @@
 
 resource "aws_route53_zone" "cluster" {
   name          = "${var.cluster-name}"
-  vpc_id        = "${var.master-lb-visibility == "Private" ? aws_vpc.main.id : ""}"
   force_destroy = true
+
+  vpc {
+    vpc_id = "${aws_vpc.main.id}"
+  }
+
+  lifecycle {
+    ignore_changes = ["vpc"]
+  }
 }
 
 resource "aws_route53_record" "cluster-root" {

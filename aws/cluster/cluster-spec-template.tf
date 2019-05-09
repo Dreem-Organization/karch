@@ -4,24 +4,35 @@ data "template_file" "cluster-spec" {
   vars {
     # Generic cluster configuration
     cluster-name       = "${var.cluster-name}"
+    kubernetes-version = "${var.kubernetes-version}"
     channel            = "${var.channel}"
-    disable-sg-ingress = "${var.disable-sg-ingress}"
     cloud-labels       = "${join("\n", data.template_file.cloud-labels.*.rendered)}"
     kube-dns-domain    = "${var.kube-dns-domain}"
     kops-state-bucket  = "${var.kops-state-bucket}"
 
+    # Control plane HA mode and network exposure configuration
     master-lb-visibility     = "${var.master-lb-visibility == "Private" ? "Internal" : "Public"}"
     master-lb-dns-visibility = "${var.master-lb-visibility}"
     master-count             = "${length(var.master-availability-zones)}"
     master-lb-idle-timeout   = "${var.master-lb-idle-timeout}"
 
-    kubernetes-version   = "${var.kubernetes-version}"
-    vpc-cidr             = "${aws_vpc.main.cidr_block}"
-    vpc-id               = "${aws_vpc.main.id}"
-    trusted-cidrs        = "${join("\n", data.template_file.trusted-cidrs.*.rendered)}"
-    subnets              = "${join("\n", data.template_file.subnets.*.rendered)}"
-    container-networking = "${var.container-networking}"
+    # Cloud provider networking configuration
+    vpc-cidr      = "${aws_vpc.main.cidr_block}"
+    vpc-id        = "${aws_vpc.main.id}"
+    trusted-cidrs = "${join("\n", data.template_file.trusted-cidrs.*.rendered)}"
+    subnets       = "${join("\n", data.template_file.subnets.*.rendered)}"
 
+    # DNS provider to use
+    dns-provider = "${var.dns-provider}"
+
+    # Kube proxy mode
+    kube-proxy-mode = "${var.kube-proxy-mode}"
+
+    # CNI plugin to use
+    container-networking = "${var.container-networking}"
+    networking-config    = "${data.template_file.networking-config.rendered}"
+
+    # Extra systemd hooks for all nodes in our cluster
     hooks = "${join("\n", data.template_file.hooks.*.rendered)}"
 
     # ETCD cluster parameters
@@ -51,7 +62,6 @@ EOF
     apiserver-storage-backend    = "etcd${substr(var.etcd-version, 0, 1)}"
     kops-authorization-mode      = "${var.rbac == "true" ? "rbac": "alwaysAllow"}"
     apiserver-authorization-mode = "${var.rbac == "true" ? "RBAC": "AlwaysAllow"}"
-    rbac-super-user              = "${var.rbac == "true" ? "authorizationRbacSuperUser: ${var.rbac-super-user}" : ""}"
 
     apiserver-runtime-config = "${join("\n", data.template_file.apiserver-runtime-configs.*.rendered)}"
     oidc-config              = "${join("\n", data.template_file.oidc-apiserver-conf.*.rendered)}"
@@ -67,6 +77,13 @@ EOF
 
     # Log level for all master & kubelet components
     log-level = "${var.log-level}"
+
+    # Should LoadBalancer service create their own security groups and add a rule in the "nodes" security group... or
+    # should we rather leave the use configure one security group for all LoadBalancer services (and leave the nodes
+    # security group alone !)
+    disable-sg-ingress = "${var.disable-sg-ingress}"
+
+    elb-security-group = "${var.lb-security-group == "" ? "" : "elbSecurityGroup: ${var.lb-security-group}"}"
   }
 }
 
@@ -140,11 +157,12 @@ data "template_file" "oidc-apiserver-conf" {
   count = "${var.oidc-issuer-url == "" ? 0 : 1}"
 
   template = <<EOF
-    oidcCAFile: ${var.oidc-ca-file}
-    oidcClientID: ${var.oidc-client-id}
-    oidcGroupsClaim: ${var.oidc-groups-claim}
     oidcIssuerURL: ${var.oidc-issuer-url}
+    oidcClientID: ${var.oidc-client-id}
     oidcUsernameClaim: ${var.oidc-username-claim}
+
+    ${var.oidc-ca-file == "" ? "" : "oidcCAFile: ${var.oidc-ca-file}"}
+    ${var.oidc-groups-claim == "" ? "" : "oidcGroupsClaim: ${var.oidc-groups-claim}"}
 EOF
 }
 
@@ -159,5 +177,15 @@ data "template_file" "hooks" {
 
   template = <<EOF
 ${element(var.hooks, count.index)}
+EOF
+}
+
+data "template_file" "networking-config" {
+  template = <<EOF
+${
+  var.container-networking == "calico" ?
+  indent(6, "\ncrossSubnet: true\nprometheusMetricsEnabled: true \nprometheusGoMetricsEnabled: true\nprometheusProcessMetricsEnabled: true\nmajorVersion: v3\n")
+  : ""
+}
 EOF
 }
