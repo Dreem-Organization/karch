@@ -19,6 +19,12 @@ variable "availability-zones" {
   description = "Availability zones to span (for HA master deployments, see master-availability-zones)"
 }
 
+variable "multi-natgw" {
+  type        = "string"
+  description = "Boolean that indicates wether or not to create NAT Gateway per Availability Zone (default: true)"
+  default     = "true"
+}
+
 variable "kops-topology" {
   type        = "string"
   description = "Kops topolopy (public|private), (default: private)"
@@ -45,6 +51,13 @@ variable "main-zone-id" {
   type        = "string"
 
   default = ""
+}
+
+variable "create-dns-zone" {
+  description = "Route53 main zone ID (optional if the cluster zone is private)"
+  type        = "string"
+
+  default = "true"
 }
 
 variable "cluster-name" {
@@ -457,6 +470,13 @@ variable "bastion-hooks" {
   default = []
 }
 
+variable "bastion-max-price" {
+  type        = "string"
+  description = "Bastion Spot instance max price"
+
+  default = ""
+}
+
 # Initial minion instance group
 variable "minion-ig-name" {
   type        = "string"
@@ -503,6 +523,13 @@ variable "minion-volume-size" {
   description = "Size of our default minion ig root volume, in GB (default: 30)"
 
   default = "30"
+}
+
+variable "minion-max-price" {
+  type        = "string"
+  description = "If set, this group will use spot instances with the specified max-price"
+
+  default = ""
 }
 
 variable "minion-volume-provisioned-iops" {
