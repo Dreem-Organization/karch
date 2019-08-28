@@ -35,11 +35,13 @@ ${join("\n", data.template_file.etcd-member.*.rendered)}
     name: main
     enableEtcdTLS: ${var.etcd-enable-tls ? "true" : "false"}
     version: ${var.etcd-version}
+    provider: ${var.etcd-enable-manager ? "Manager" : "Legacy"}
   - etcdMembers:
 ${join("\n", data.template_file.etcd-member.*.rendered)}
     name: events
     enableEtcdTLS: ${var.etcd-enable-tls}
     version: ${var.etcd-version}
+    provider: ${var.etcd-enable-manager ? "Manager" : "Legacy"}
 EOF
 
     # Kubelet configuration
@@ -189,4 +191,3 @@ ${var.container-networking == "calico" ? indent(
 EOF
 
 }
-
