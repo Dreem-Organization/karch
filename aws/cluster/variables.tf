@@ -620,7 +620,7 @@ variable "log-level" {
   default = 0
 }
 
-variable "etcd-enable-manager" {
+variable "enable-etcd-manager" {
   type    = string
   default = "false"
 }
