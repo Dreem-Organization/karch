@@ -624,3 +624,8 @@ variable "etcd-enable-manager" {
   type    = string
   default = "false"
 }
+
+variable "kops-cmd" {
+  type    = string
+  default = "kops"
+}

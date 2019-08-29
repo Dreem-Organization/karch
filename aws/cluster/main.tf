@@ -20,7 +20,7 @@ EOF
     // On destroy, remove the cluster first, if it exists
     provisioner "local-exec" {
       when    = destroy
-      command = "(test -z \"$(${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} kops --state=s3://${var.kops-state-bucket} get cluster | grep ${var.cluster-name})\" ) || ${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} kops --state=s3://${var.kops-state-bucket} delete cluster --yes ${var.cluster-name}"
+      command = "(test -z \"$(${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} ${var.kops-cmd} --state=s3://${var.kops-state-bucket} get cluster | grep ${var.cluster-name})\" ) || ${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} ${var.kops-cmd} --state=s3://${var.kops-state-bucket} delete cluster --yes ${var.cluster-name}"
     }
 
     depends_on = [
@@ -58,7 +58,7 @@ EOF
 // Let's register our Kops cluster into remote state
 // Let's register our Kops cluster into remote state
 provisioner "local-exec" {
-command = "${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} kops --state=s3://${var.kops-state-bucket} create -f ${path.module}/${var.cluster-name}-cluster-spec.yml"
+command = "${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} ${var.kops-cmd} --state=s3://${var.kops-state-bucket} create -f ${path.module}/${var.cluster-name}-cluster-spec.yml"
 }
 
 // Let's remove the cluster spec file from disk
@@ -70,7 +70,7 @@ command = "rm ${path.module}/${var.cluster-name}-cluster-spec.yml"
 // Do not forget to add our public SSH key over there
 // Do not forget to add our public SSH key over there
 provisioner "local-exec" {
-command = "${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} kops --state=s3://${var.kops-state-bucket} create secret --name ${var.cluster-name} sshpublickey admin -i ${var.admin-ssh-public-key-path}"
+command = "${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} ${var.kops-cmd} --state=s3://${var.kops-state-bucket} create secret --name ${var.cluster-name} sshpublickey admin -i ${var.admin-ssh-public-key-path}"
 }
 
 depends_on = [aws_s3_bucket_object.cluster-spec]
@@ -80,7 +80,7 @@ depends_on = [aws_s3_bucket_object.cluster-spec]
 resource "null_resource" "master-up" {
 provisioner "local-exec" {
 command = <<EOF
-      until ${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} kops --state=s3://${var.kops-state-bucket} validate cluster --name ${var.cluster-name}
+      until ${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} ${var.kops-cmd} --state=s3://${var.kops-state-bucket} validate cluster --name ${var.cluster-name}
       do
         echo "Cluster isn't available yet"
         sleep 5s
@@ -109,12 +109,12 @@ FILEDUMP
 
       provisioner "local-exec" {
         command = <<EOF
-      ${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} kops --state=s3://${var.kops-state-bucket} \
+      ${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} ${var.kops-cmd} --state=s3://${var.kops-state-bucket} \
         replace -f ${path.module}/${var.cluster-name}-cluster-spec.yml  || exit -1
 
       rm -f ${path.module}/${var.cluster-name}-cluster-spec.yml
 
-      ${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} kops --state=s3://${var.kops-state-bucket} \
+      ${var.nodeup-url-env} AWS_SDK_LOAD_CONFIG=1 AWS_PROFILE=${var.aws-profile} ${var.kops-cmd} --state=s3://${var.kops-state-bucket} \
         update cluster ${var.cluster-name} --yes  || exit -1
 EOF
 
@@ -122,4 +122,3 @@ EOF
 
       depends_on = [null_resource.kops-cluster]
     }
-

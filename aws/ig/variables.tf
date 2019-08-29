@@ -173,3 +173,7 @@ variable "additional-user-data" {
   default = ""
 }
 
+variable "kops-cmd" {
+  type    = string
+  default = "kops"
+}
