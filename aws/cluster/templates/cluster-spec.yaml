@@ -34,7 +34,6 @@ ${etcd-clusters}
     - DefaultTolerationSeconds
     - MutatingAdmissionWebhook
     - ResourceQuota
-    - Initializers
     - NodeRestriction
     - Priority
     - PersistentVolumeClaimResize
