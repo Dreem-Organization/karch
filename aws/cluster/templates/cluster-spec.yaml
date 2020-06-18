@@ -63,7 +63,7 @@ ${apiserver-runtime-config}
     featureGates:
       ExperimentalCriticalPodAnnotation: "true"
       ExpandPersistentVolumes: "true"
-      Initializers: "true"
+
       PodPriority: "true"
   kubeControllerManager:
     allocateNodeCIDRs: true
@@ -83,7 +83,6 @@ ${apiserver-runtime-config}
     featureGates:
       ExperimentalCriticalPodAnnotation: "true"
       ExpandPersistentVolumes: "true"
-      Initializers: "true"
       PodPriority: "true"
 
   kubeDNS:
@@ -130,7 +129,7 @@ ${apiserver-runtime-config}
     featureGates:
       ExperimentalCriticalPodAnnotation: "true"
       ExpandPersistentVolumes: "true"
-      Initializers: "true"
+
       PodPriority: "true"
   kubernetesApiAccess:
 ${trusted-cidrs}
